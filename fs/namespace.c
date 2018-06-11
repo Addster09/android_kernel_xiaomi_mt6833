@@ -112,7 +112,7 @@ static inline struct hlist_head *mp_hash(struct dentry *dentry)
 
 static int mnt_alloc_id(struct mount *mnt)
 {
-	int res = ida_simple_get(&mnt_id_ida, 0, 0, GFP_KERNEL);
+	int res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
 
 	if (res < 0)
 		return res;
@@ -136,7 +136,7 @@ static void mnt_free_id(struct mount *mnt)
 	}
 
 #endif
-	ida_simple_remove(&mnt_id_ida, mnt->mnt_id);
+	ida_free(&mnt_id_ida, mnt->mnt_id);
 }
 
 /*
@@ -188,7 +188,7 @@ void mnt_release_group_id(struct mount *mnt)
 		return;
 	}
 #endif
-	ida_simple_remove(&mnt_group_ida, mnt->mnt_group_id);
+	ida_free(&mnt_group_ida, mnt->mnt_group_id);
 	mnt->mnt_group_id = 0;
 }
 
