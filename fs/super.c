@@ -976,7 +976,7 @@ int get_anon_bdev(dev_t *p)
 	 * Many userspace utilities consider an FSID of 0 invalid.
 	 * Always return at least 1 from get_anon_bdev.
 	 */
-	dev = ida_simple_get(&unnamed_dev_ida, 1, (1 << MINORBITS) - 1,
+	dev = ida_alloc_range(&unnamed_dev_ida, 1, (1 << MINORBITS) - 1,
 			GFP_ATOMIC);
 	if (dev == -ENOSPC)
 		dev = -EMFILE;
@@ -990,7 +990,7 @@ EXPORT_SYMBOL(get_anon_bdev);
 
 void free_anon_bdev(dev_t dev)
 {
-	ida_simple_remove(&unnamed_dev_ida, MINOR(dev));
+	ida_free(&unnamed_dev_ida, MINOR(dev));
 }
 EXPORT_SYMBOL(free_anon_bdev);
 
