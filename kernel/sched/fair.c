@@ -144,7 +144,7 @@ unsigned int normalized_sysctl_sched_wakeup_granularity	= 4000000UL;
 unsigned int sysctl_sched_wakeup_granularity		= 1000000UL;
 unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 #endif // CONFIG_SCHED_BORE
-const_debug unsigned int sysctl_sched_migration_cost	= 33000UL;
+const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
 #ifdef CONFIG_SCHED_WALT
 unsigned int sysctl_sched_use_walt_cpu_util = 1;
