@@ -319,6 +319,7 @@ static inline void i2c_writew(u16 value, struct mt_i2c *i2c, u16 offset)
 void ccu_i2c_dump_errr(void)
 {
 	struct i2c_client *pClient = NULL;
+	struct mt_i2c *i2c;
 
 	pClient = getCcuI2cClient();
 	if (pClient == NULL) {
