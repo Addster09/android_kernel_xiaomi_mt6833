@@ -41,6 +41,35 @@ $(MODULE_NAME)-objs += power_throttling/adapter.o
 $(MODULE_NAME)-objs += power_throttling/core.o
 ifeq ($(CONFIG_CONN_PWR_DEBUG),y)
     $(MODULE_NAME)-objs += power_throttling/test.o
+
+    # Do build-in for Makefile checking
+    # export CONFIG_WLAN_DRV_BUILD_IN=y
+
+    # for gen4m options
+    export CONFIG_MTK_COMBO_WIFI_HIF=axi
+    export WLAN_CHIP_ID=6833
+    export MTK_COMBO_CHIP=SOC2_1X1
+    export MTK_ANDROID_WMT=y
+    export MTK_ANDROID_EMI=y
+    export MTK_WLAN_SERVICE=y
+    export WIFI_IP_SET=1
+
+    # Remove debugging
+    export TARGET_BUILD_VARIANT=user
+
+    # Do build-in for xxx.c checking
+    subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
+    subdir-ccflags-y += -D MTK_WCN_BUILT_IN_DRIVER
+
+    obj-$(CONFIG_MTK_COMBO) += common/
+    obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/adaptor/
+    obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/core/gen4m/
+    obj-$(CONFIG_MTK_COMBO_BT) += bt/mt66xx/
+    obj-$(CONFIG_MTK_COMBO_GPS) += gps/
+ifeq ($(CONFIG_MTK_FMRADIO),y)
+    export CFG_FM_CHIP_ID=6833
+    export CFG_FM_CHIP=mt6631
+    obj-y += fmradio/
 endif
 
 ifeq ($(CONFIG_MTK_COMBO), y)
