@@ -886,10 +886,10 @@ int access_guest(struct kvm_vcpu *vcpu, unsigned long ga, u8 ar, void *data,
 		 unsigned long len, enum gacc_mode mode)
 {
 	psw_t *psw = &vcpu->arch.sie_block->gpsw;
-	unsigned long nr_pages, gpa, idx;
-	unsigned long pages_array[2];
+	unsigned long nr_pages, idx;
+	unsigned long gpa_array[2];
 	unsigned int fragment_len;
-	unsigned long *pages;
+	unsigned long *gpas;
 	int need_ipte_lock;
 	union asce asce;
 	int rc;
@@ -911,14 +911,12 @@ int access_guest(struct kvm_vcpu *vcpu, unsigned long ga, u8 ar, void *data,
 		ipte_lock(vcpu);
 	rc = guest_range_to_gpas(vcpu, ga, ar, gpas, len, asce, mode);
 	for (idx = 0; idx < nr_pages && !rc; idx++) {
-		gpa = pages[idx] + offset_in_page(ga);
-		fragment_len = min(PAGE_SIZE - offset_in_page(gpa), len);
+		fragment_len = min(PAGE_SIZE - offset_in_page(gpas[idx]), len);
 		if (mode == GACC_STORE)
-			rc = kvm_write_guest(vcpu->kvm, gpa, data, fragment_len);
+			rc = kvm_write_guest(vcpu->kvm, gpas[idx], data, fragment_len);
 		else
-			rc = kvm_read_guest(vcpu->kvm, gpa, data, fragment_len);
+			rc = kvm_read_guest(vcpu->kvm, gpas[idx], data, fragment_len);
 		len -= fragment_len;
-		ga += fragment_len;
 		data += fragment_len;
 	}
 	if (need_ipte_lock)
