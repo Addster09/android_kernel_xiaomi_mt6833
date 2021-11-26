@@ -886,10 +886,10 @@ int access_guest(struct kvm_vcpu *vcpu, unsigned long ga, u8 ar, void *data,
 		 unsigned long len, enum gacc_mode mode)
 {
 	psw_t *psw = &vcpu->arch.sie_block->gpsw;
-	unsigned long nr_pages, idx;
-	unsigned long gpa_array[2];
+	unsigned long nr_pages, gpa, idx;
+	unsigned long pages_array[2];
 	unsigned int fragment_len;
-	unsigned long *gpas;
+	unsigned long *pages;
 	int need_ipte_lock;
 	union asce asce;
 	int rc;
@@ -911,9 +911,14 @@ int access_guest(struct kvm_vcpu *vcpu, unsigned long ga, u8 ar, void *data,
 		ipte_lock(vcpu);
 	rc = guest_range_to_gpas(vcpu, ga, ar, gpas, len, asce, mode);
 	for (idx = 0; idx < nr_pages && !rc; idx++) {
-		fragment_len = min(PAGE_SIZE - offset_in_page(gpas[idx]), len);
-		rc = access_guest_page(vcpu->kvm, mode, gpas[idx], data, fragment_len);
+		gpa = pages[idx] + offset_in_page(ga);
+		fragment_len = min(PAGE_SIZE - offset_in_page(gpa), len);
+		if (mode == GACC_STORE)
+			rc = kvm_write_guest(vcpu->kvm, gpa, data, fragment_len);
+		else
+			rc = kvm_read_guest(vcpu->kvm, gpa, data, fragment_len);
 		len -= fragment_len;
+		ga += fragment_len;
 		data += fragment_len;
 	}
 	if (need_ipte_lock)
@@ -933,7 +938,10 @@ int access_guest_real(struct kvm_vcpu *vcpu, unsigned long gra,
 	while (len && !rc) {
 		gpa = kvm_s390_real_to_abs(vcpu, gra);
 		fragment_len = min(PAGE_SIZE - offset_in_page(gpa), len);
-		rc = access_guest_page(vcpu->kvm, mode, gpa, data, fragment_len);
+		if (mode)
+			rc = write_guest_abs(vcpu, gpa, data, fragment_len);
+		else
+			rc = read_guest_abs(vcpu, gpa, data, fragment_len);
 		len -= fragment_len;
 		gra += fragment_len;
 		data += fragment_len;
