@@ -1779,7 +1779,6 @@ static struct platform_driver _mt_cpufreq_pdrv = {
 };
 
 /* Module driver */
-extern unsigned long cpufreq_max_freq;
 #ifdef CONFIG_CPU_FREQ_MTK
 extern void cpufreq_mtk_set_table(int cpu, struct cpufreq_frequency_table *ftbl);
 #endif
