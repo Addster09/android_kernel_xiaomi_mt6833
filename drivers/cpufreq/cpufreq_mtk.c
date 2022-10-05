@@ -29,57 +29,11 @@
 static struct kobj_attribute _name##_attr =			\
 __ATTR(_name, 0644, show_##_name, store_##_name)
 
-/* cpu frequency table from cpufreq dt parse */
-static struct cpufreq_frequency_table* cpuftbl[2];
-
 static struct ppm_limit_data *current_cpu_freq;
 
 extern int set_sched_boost(unsigned int val);
 
 DEFINE_MUTEX(cpufreq_mtk_mutex);
-
-struct cpufreq_mtk_topo_config {
-    unsigned int ltl_cpu_start;
-    unsigned int big_cpu_start;
-};
-
-#if defined(CONFIG_MACH_MT6768)
-static const struct cpufreq_mtk_topo_config topology = {
-    .ltl_cpu_start			= 0,
-    .big_cpu_start			= 6,
-};
-#endif
-
-void cpufreq_mtk_set_table(int cpu, struct cpufreq_frequency_table *ftbl)
-{
-	if ( cpu == topology.big_cpu_start )
-		cpuftbl[BIG] = ftbl;
-	else if ( cpu == topology.ltl_cpu_start )
-		cpuftbl[LITTLE] = ftbl;
-}
-EXPORT_SYMBOL_GPL(cpufreq_mtk_set_table);
-
-int is_freq_valid(int cluster, int freq) {
-    struct cpufreq_frequency_table *pos;
-    int ret;
-
-    /* 
-     * Allow -1 frequency as that is
-     * used to remove the limit.
-     */
-    if (freq == -1)
-        goto out;
-
-    cpufreq_for_each_valid_entry(pos, cpuftbl[cluster]) {
-        if (pos->frequency == freq)
-            goto out;
-    }
-
-    ret = 1;
-
-out:
-    return ret;
-}
 
 /* Updates CPU frequency for chosen cluster */
 void update_cpu_freq(int cluster)
@@ -98,39 +52,25 @@ void update_cpu_freq(int cluster)
 /* Sets current maximum CPU frequency */
 int set_max_cpu_freq(int cluster, int max)
 {
-    int ret = -EINVAL;
-
-    if (unlikely(!is_freq_valid(cluster, max)))
-        goto out;
-
-    if (unlikely(max < current_cpu_freq[cluster].min && current_cpu_freq[cluster].min > 0))
-        goto out;
-
+    if (max < current_cpu_freq[cluster].min && current_cpu_freq[cluster].min > 0) {
+        pr_err("[%s] Max freq cannot be lower than min freq!\n", __func__);
+        return -EINVAL;
+    }
     current_cpu_freq[cluster].max = max > 0 ? max : -1;
     update_cpu_freq(cluster);
-    ret = 0;
-
-out:
-    return ret;
+    return 0;
 }
 
 /* Sets current minimum CPU frequency */
 int set_min_cpu_freq(int cluster, int min)
 {
-    int ret = -EINVAL;
-
-    if (unlikely(!is_freq_valid(cluster, min)))
-        goto out;
-
-    if (unlikely(min > current_cpu_freq[cluster].max && current_cpu_freq[cluster].max > 0))
-        goto out;
-
+    if (min > current_cpu_freq[cluster].max && current_cpu_freq[cluster].max > 0) {
+        pr_err("[%s] Min freq cannot be higher than max freq!\n", __func__);
+        return -EINVAL;
+    }
     current_cpu_freq[cluster].min = min > 0 ? min : -1;
     update_cpu_freq(cluster);
-    ret = 0;
-
-out:
-    return ret;
+    return 0;
 }
 
 static ssize_t show_lcluster_min_freq(struct kobject *kobj,
@@ -154,7 +94,7 @@ static ssize_t store_lcluster_min_freq(struct kobject *kobj,
     mutex_unlock(&cpufreq_mtk_mutex);
 
     if (ret < 0)
-        count = ret;
+        return ret;
 
     return count;
 }
@@ -182,7 +122,7 @@ static ssize_t store_lcluster_max_freq(struct kobject *kobj,
     mutex_unlock(&cpufreq_mtk_mutex);
 
     if (ret < 0)
-        count = ret;
+        return ret;
 
     return count;
 }
