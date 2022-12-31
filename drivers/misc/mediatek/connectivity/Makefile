@@ -55,7 +55,6 @@ endif
     export MTK_ANDROID_EMI=y
     export MTK_WLAN_SERVICE=y
     export WIFI_IP_SET=1
-    export BT_PLATFORM=connac1x
 
     # Do build-in for xxx.c checking
     subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
