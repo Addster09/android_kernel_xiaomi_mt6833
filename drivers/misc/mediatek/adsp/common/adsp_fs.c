@@ -365,7 +365,7 @@ static long adsp_driver_ioctl(
 	}
 
 	if (ret < 0)
-		pr_debug("%s(), ioctl error %d\n", __func__, ret);
+		pr_err("%s(), ioctl error %d\n", __func__, ret);
 
 	return ret;
 }
@@ -374,7 +374,7 @@ static long adsp_driver_compat_ioctl(
 	struct file *file, unsigned int cmd, unsigned long arg)
 {
 	if (!file->f_op || !file->f_op->unlocked_ioctl) {
-		pr_notice("op null\n");
+		pr_debug("op null\n");
 		return -ENOTTY;
 	}
 	return file->f_op->unlocked_ioctl(file, cmd, arg);

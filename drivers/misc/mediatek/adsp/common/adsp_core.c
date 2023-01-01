@@ -443,7 +443,7 @@ static int __init adsp_module_init(void)
 	return ret;
 
 ERROR:
-	pr_debug("%s fail ret(%d)\n", __func__, ret);
+	pr_err("%s fail ret(%d)\n", __func__, ret);
 	return ret;
 }
 
