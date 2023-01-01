@@ -929,30 +929,11 @@ static void ccci_dump_buffer_init(void)
 		}
 	}
 
-#if defined(CONFIG_MTK_AEE_FEATURE)
-	/*
-	 *kernel __pa is available for LM VA
-	 *so, if it's belongs to ioremap/vmap for DTS reserved memory
-	 *it should not use mrdump_mini_add_misc() directly
-	 *instead of it, it should fill pa explicitly
-	 */
-	if (reg_dump_ctlb[0].buf_pa) {
-		mrdump_mini_add_misc_pa((unsigned long)reg_dump_ctlb[0].buffer,
-				(unsigned long)reg_dump_ctlb[0].buf_pa,
-				CCCI_REG_DUMP_BUF, 0, "_EXTRA_MD_");
-	} else {
-		mrdump_mini_add_misc((unsigned long)reg_dump_ctlb[0].buffer, CCCI_REG_DUMP_BUF,
-			0, "_EXTRA_MD_");
-	}
-
-	if (ke_dump_ctlb[0].buf_pa) {
-		mrdump_mini_add_misc_pa((unsigned long)ke_dump_ctlb[0].buffer,
-				(unsigned long)ke_dump_ctlb[0].buf_pa,
-				CCCI_KE_DUMP_BUF, 0, "_EXTRA_CCCI_");
-	} else {
-		mrdump_mini_add_misc((unsigned long)ke_dump_ctlb[0].buffer, CCCI_KE_DUMP_BUF,
-			0, "_EXTRA_CCCI_");
-	}
+#ifdef CONFIG_MTK_AEE_IPANIC
+	mrdump_mini_add_misc((unsigned long)reg_dump_ctlb[0].buffer, CCCI_REG_DUMP_BUF,
+		0, "_EXTRA_MD_");
+	mrdump_mini_add_misc((unsigned long)ke_dump_ctlb[0].buffer, CCCI_KE_DUMP_BUF,
+		0, "_EXTRA_CCCI_");
 #endif
 }
 
