@@ -1506,13 +1506,8 @@ static struct freq_attr *_mt_cpufreq_attr[] = {
 };
 
 static struct cpufreq_driver _mt_cpufreq_driver = {
-#ifndef CONFIG_MTK_CPU_FREQ_STANDARDIZE
-#if defined(CONFIG_MTK_PLAT_MT6885_EMULATION) || defined(CONFIG_MACH_MT6893) \
-	|| defined(CONFIG_MACH_MT6833) || defined(CONFIG_MACH_MT6781)
 	.flags = CPUFREQ_ASYNC_NOTIFICATION | CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
-#else /* CONFIG_MTK_PLAT_MT6885_EMULATION */
-	.flags = CPUFREQ_ASYNC_NOTIFICATION,
-#endif /* CONFIG_MTK_PLAT_MT6885_EMULATION */
+	.verify = _mt_cpufreq_verify,
 	.target = _mt_cpufreq_target,
 #else /* CONFIG_MTK_CPU_FREQ_STANDARDIZE */
 	.flags = CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
