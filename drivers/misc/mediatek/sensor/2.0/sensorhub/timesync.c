@@ -97,7 +97,7 @@ static int timesync_comm_with_nolock(void)
 	time = (struct sensor_comm_timesync *)ctrl->data;
 
 	local_irq_save(flags);
-	now_time = ktime_get_boot_ns();
+	now_time = ktime_get_boottime_ns();
 	arch_counter = arch_counter_get_cntvct();
 	local_irq_restore(flags);
 	pr_info("host boottime %lld\n", now_time);
@@ -147,7 +147,7 @@ void timesync_filter_set(struct timesync_filter *filter,
 	}
 
 	local_irq_save(flags);
-	host_timestamp = ktime_get_boot_ns();
+	host_timestamp = ktime_get_boottime_ns();
 	host_archcounter = arch_counter_get_cntvct();
 	local_irq_restore(flags);
 	ipi_transfer_time = arch_counter_to_ns(host_archcounter -
@@ -204,14 +204,14 @@ void timesync_stop(void)
 
 void timesync_resume(void)
 {
-	pr_info("host resume boottime %lld\n", ktime_get_boot_ns());
+	pr_info("host resume boottime %lld\n", ktime_get_boottime_ns());
 	WRITE_ONCE(timesync_suspend_flag, false);
 	timesync_comm_with();
 }
 
 void timesync_suspend(void)
 {
-	pr_info("host suspend boottime %lld\n", ktime_get_boot_ns());
+	pr_info("host suspend boottime %lld\n", ktime_get_boottime_ns());
 	WRITE_ONCE(timesync_suspend_flag, true);
 }
 
