@@ -19,6 +19,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/uaccess.h>
 #include <linux/mm_inline.h>
+#include <linux/pkeys.h>
 
 #include <asm/elf.h>
 #include <asm/tlb.h>
@@ -1042,10 +1043,7 @@ const struct file_operations proc_pid_smaps_rollup_operations = {
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= smaps_rollup_release,
-<<<<<<< HEAD
 	.release	= proc_map_release,
-=======
->>>>>>> b1a13038403c (mm: /proc/pid/smaps_rollup: convert to single value seq_file)
 };
 
 enum clear_refs_types {
