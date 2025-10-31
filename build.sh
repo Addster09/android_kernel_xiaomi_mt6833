@@ -33,8 +33,6 @@ if [ ! -d "$TC_DIR" ]; then
 fi
 
 export PATH="$TC_DIR/bin:$PATH"
-# Used to fix build errors on Arch Linux, remove if you face tool issues anywhere else
-export PATH="/usr/bin:$PATH"
 
 # Process options
 CLEAN_BUILD=false
