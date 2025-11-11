@@ -37,9 +37,10 @@ export PATH="$TC_DIR/bin:$PATH"
 export CC=clang
 export LD=ld.lld
 
+echo 
 echo "Using compiler:"
 clang --version
-echo "\n"
+echo 
 
 # Process options
 CLEAN_BUILD=false
