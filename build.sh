@@ -18,6 +18,7 @@ DATE=$(date '+%Y%m%d-%H%M')
 # Toolchain
 TC_DIR="$HOME/toolchains/neutron-clang"
 CURRENT_DIR=$(pwd)
+[[ ! -x "$TC_DIR/bin/clang" ]] && echo "Error: toolchain did not install correctly" && exit 1
 
 # Device Configs
 DEVICE="everpal"
@@ -33,6 +34,12 @@ if [ ! -d "$TC_DIR" ]; then
 fi
 
 export PATH="$TC_DIR/bin:$PATH"
+export CC=clang
+export LD=ld.lld
+
+echo "Using compiler:"
+clang --version
+echo "\n"
 
 # Process options
 CLEAN_BUILD=false
