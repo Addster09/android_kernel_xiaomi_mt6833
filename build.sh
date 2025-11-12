@@ -3,6 +3,9 @@
 # Compile script for Hydrogen kernel
 # Optimized by ChatGPT
 
+# Remove out directory
+rm -rf out/arch/arm64/boot
+
 # Prebuild hacks
 rm -rf .config .config.old .tmp_versions
 rm -rf include/generated include/config
@@ -77,7 +80,7 @@ if make -j$(nproc --all) O=out ARCH=arm64 CC="ccache clang" LLVM=1 LLVM_IAS=1 CR
     git clone -q --depth=1 https://github.com/Addster09/AnyKernel3 AnyKernel3
     cp out/arch/arm64/boot/Image.gz AnyKernel3
     (cd AnyKernel3 && zip -r9 "../$ZIPNAME" * -x '*.git*' README.md '*placeholder')
-    rm -rf AnyKernel3 out/arch/arm64/boot
+    rm -rf AnyKernel3 
 
     # Clean up KernelSU changes if applied
     if [ "$INCLUDE_KSU" = true ]; then
