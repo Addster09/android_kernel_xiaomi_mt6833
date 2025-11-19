@@ -16,7 +16,6 @@
 #include <linux/kernel.h>
 #include <linux/notifier.h>
 #include <linux/perf_event.h>
-#include <trace/events/mtk_events.h>
 #ifdef CONFIG_MTK_QOS_FRAMEWORK
 #include <mtk_qos_ipi.h>
 #endif
@@ -28,10 +27,6 @@
 #endif
 #ifdef CONFIG_MTK_CPU_FREQ
 #include <mach/mtk_cpufreq_api.h>
-#endif
-#ifndef __CHECKER__
-#define CREATE_TRACE_POINTS
-#include <mtk_swpm_tracker_trace.h>
 #endif
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 #include <sspm_reservedmem.h>
@@ -803,11 +798,7 @@ static void swpm_log_loop(unsigned long data)
 		/* set share sram clear flag and release lock */
 		share_idx_ctrl->clear_flag = 1;
 
-		/* put power index data to ftrace */
-		trace_swpm_power_idx(idx_buf);
 	}
-	/* put power data to ftrace */
-	trace_swpm_power(buf);
 
 #ifdef LOG_LOOP_TIME_PROFILE
 	t2 = ktime_get();
