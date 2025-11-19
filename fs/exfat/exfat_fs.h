@@ -221,15 +221,9 @@ struct exfat_dir_entry {
 	unsigned short attr;
 	loff_t size;
 	unsigned int num_subdirs;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	struct timespec64 atime;
 	struct timespec64 mtime;
 	struct timespec64 crtime;
-#else
-	struct timespec atime;
-	struct timespec mtime;
-	struct timespec crtime;
-#endif
 	struct exfat_dentry_namebuf namebuf;
 };
 
@@ -343,11 +337,7 @@ struct exfat_inode_info {
 	struct rw_semaphore truncate_lock;
 	struct inode vfs_inode;
 	/* File creation time */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	struct timespec64 i_crtime;
-#else
-	struct timespec i_crtime;
-#endif
 };
 
 static inline struct exfat_sb_info *EXFAT_SB(struct super_block *sb)
@@ -593,7 +583,6 @@ void __exfat_fs_error(struct super_block *sb, int report, const char *fmt, ...)
 #define exfat_debug(sb, fmt, ...)					\
 	pr_debug("exFAT-fs (%s): " fmt "\n", (sb)->s_id, ##__VA_ARGS__)
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 void exfat_get_entry_time(struct exfat_sb_info *sbi, struct timespec64 *ts,
 		u8 tz, __le16 time, __le16 date, u8 time_cs);
 void exfat_truncate_atime(struct timespec64 *ts);
@@ -602,13 +591,6 @@ void exfat_truncate_inode_atime(struct inode *inode);
 #endif
 void exfat_set_entry_time(struct exfat_sb_info *sbi, struct timespec64 *ts,
 		u8 *tz, __le16 *time, __le16 *date, u8 *time_cs);
-#else
-void exfat_get_entry_time(struct exfat_sb_info *sbi, struct timespec *ts,
-		u8 tz, __le16 time, __le16 date, u8 time_cs);
-void exfat_truncate_atime(struct timespec *ts);
-void exfat_set_entry_time(struct exfat_sb_info *sbi, struct timespec *ts,
-		u8 *tz, __le16 *time, __le16 *date, u8 *time_cs);
-#endif
 u16 exfat_calc_chksum16(void *data, int len, u16 chksum, int type);
 u32 exfat_calc_chksum32(void *data, int len, u32 chksum, int type);
 void exfat_update_bh(struct buffer_head *bh, int sync);
