@@ -21,7 +21,6 @@ DATE=$(date '+%Y%m%d-%H%M')
 # Toolchain
 TC_DIR="$HOME/toolchains/neutron-clang"
 CURRENT_DIR=$(pwd)
-[[ ! -x "$TC_DIR/bin/clang" ]] && echo "Error: toolchain did not install correctly" && exit 1
 
 # Device Configs
 DEVICE="everpal"
