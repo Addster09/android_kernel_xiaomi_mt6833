@@ -54,7 +54,7 @@ INCLUDE_KSU=false
 # Include KernelSU if specified
 if [ "$INCLUDE_KSU" = true ]; then
     echo "Including KernelSU Next... Save your stuff!"
-    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s v1.0.9
+    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
     git clone https://github.com/WildKernels/kernel_patches.git kernel_patches
     cd KernelSU-Next
     wget -q https://github.com/devnoname120/susfs4ksu-toco/raw/refs/heads/kernel-4.14-backport/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
@@ -72,7 +72,18 @@ mkdir -p out
 make O=out ARCH=arm64 "$DEFCONFIG"
 
 echo -e "\nStarting compilation...\n"
-if make -j$(nproc --all) O=out ARCH=arm64 CC="ccache clang" LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz; then
+
+if \
+	make -j$(nproc --all) O=out \
+	ARCH=arm64 \
+	CC="ccache clang" \
+	LLVM=1 \
+	LLVM_IAS=1 \
+	CROSS_COMPILE=aarch64-linux-gnu- \
+	CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+	Image.gz dtbs; \
+	then
+
     echo -e "\nKernel compiled successfully! Zipping up...\n"
 
     # Clone AnyKernel3 and create zip
