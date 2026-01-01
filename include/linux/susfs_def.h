@@ -2,6 +2,7 @@
 #define KSU_SUSFS_DEF_H
 
 #include <linux/bits.h>
+#include <linux/cred.h>
 
 /********/
 /* ENUM */
@@ -9,8 +10,8 @@
 /* shared with userspace ksu_susfs tool */
 #define SUSFS_MAGIC 0xFAFAFAFA
 #define CMD_SUSFS_ADD_SUS_PATH 0x55550
-#define CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH 0x55551
-#define CMD_SUSFS_SET_SDCARD_ROOT_PATH 0x55552
+#define CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH 0x55551 /* deprecated */
+#define CMD_SUSFS_SET_SDCARD_ROOT_PATH 0x55552 /* deprecated */
 #define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55553
 #define CMD_SUSFS_ADD_SUS_MOUNT 0x55560 /* deprecated */
 #define CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS 0x55561
@@ -44,6 +45,7 @@
 #define DEFAULT_KSU_MNT_ID 500000 /* used by mount->mnt_id */
 #define DEFAULT_SUS_MNT_ID_FOR_KSU_PROC_UNSHARE 1000000 /* used by vfsmount->susfs_mnt_id_backup */
 #define DEFAULT_KSU_MNT_GROUP_ID 5000 /* used by mount->mnt_group_id */
+#define VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT 0x80000000 /* used for mounts that are unshared by ksu process */
 
 /*
  * mount->mnt.susfs_mnt_id_backup => storing original mount's mnt_id
@@ -84,4 +86,24 @@ static inline bool susfs_is_current_proc_umounted(void) {
 static inline void susfs_set_current_proc_umounted(void) {
 	set_ti_thread_flag(&current->thread_info, TIF_PROC_UMOUNTED);
 }
+
+static inline bool susfs_is_current_proc_umounted_app(void) {
+	return (test_ti_thread_flag(&current->thread_info, TIF_PROC_UMOUNTED) &&
+			current_uid().val >= 10000);
+}
+
+#define SUSFS_IS_INODE_SUS_MAP(inode) \
+		inode && \
+		unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_state)) && \
+		susfs_is_current_proc_umounted_app()
+
+#define SUSFS_IS_INODE_OPEN_REDIRECT_WITHOUT_UID_CHECK(inode) \
+		inode && \
+		unlikely(test_bit(AS_FLAGS_OPEN_REDIRECT, &inode->i_state))
+
+#define SUSFS_IS_INODE_OPEN_REDIRECT(inode) \
+		inode && \
+		unlikely(test_bit(AS_FLAGS_OPEN_REDIRECT, &inode->i_state)) && \
+		susfs_is_current_proc_umounted_app()
+
 #endif // #ifndef KSU_SUSFS_DEF_H
