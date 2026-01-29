@@ -1319,7 +1319,7 @@ static int st21nfc_resume(struct device *device)
 static const struct i2c_device_id st21nfc_id[] = {{"st21nfc", 0}, {} };
 
 static const struct of_device_id st21nfc_of_match[] = {
-	{	.compatible = "mediatek,nfc" },
+	{	.compatible = "mediatek,nfc-gpio-v2" },
 	{ } };
 MODULE_DEVICE_TABLE(of, st21nfc_of_match);
 
@@ -1359,10 +1359,15 @@ static struct platform_driver st21nfc_platform_driver = {
 		},
 };
 #endif /* KRNMTKLEGACY_GPIO */
+extern char *saved_command_line;
 
 /* module load/unload record keeping */
 static int __init st21nfc_dev_init(void)
 {
+	if (strstr(saved_command_line,"board_id=S98016AA1") || strstr(saved_command_line,"board_id=S98016BA1")) {
+		pr_err("%s: Not support NFC\n", __func__);
+		return -ENODEV;
+	}
 	pr_info("Loading st21nfc driver\n");
 #ifndef KRNMTKLEGACY_GPIO
 	platform_driver_register(&st21nfc_platform_driver);
