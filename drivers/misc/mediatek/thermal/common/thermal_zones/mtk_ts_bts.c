@@ -115,7 +115,7 @@ do {                                    \
 
 
 #define mtkts_bts_printk(fmt, args...) \
-pr_notice("[Thermal/TZ/BTS]" fmt, ##args)
+pr_debug("[Thermal/TZ/BTS]" fmt, ##args)
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
 struct iio_channel *thermistor_ch0;
@@ -755,7 +755,7 @@ int mtkts_bts_get_hw_temp(void)
 		t_ret2 = wakeup_ta_algo(TA_CATMPLUS_TTJ);
 
 		if (t_ret2 < 0)
-			pr_notice("[Thermal/TZ/BTS]wakeup_ta_algo %d\n",
+			pr_debug("[Thermal/TZ/BTS]wakeup_ta_algo %d\n",
 				t_ret2);
 	}
 
@@ -1175,7 +1175,7 @@ void mtkts_bts_prepare_table(int table_num)
 		break;
 	}
 
-	pr_notice("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
+	pr_debug("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
 
 #if 0
 	{
