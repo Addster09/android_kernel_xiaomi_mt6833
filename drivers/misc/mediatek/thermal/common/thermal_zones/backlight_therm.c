@@ -115,7 +115,7 @@ do {                                    \
 
 
 #define backlight_therm_printk(fmt, args...) \
-pr_notice("[Thermal/TZ/BACKLIGHT_THERM]" fmt, ##args)
+pr_debug("[Thermal/TZ/BACKLIGHT_THERM]" fmt, ##args)
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
 struct iio_channel *thermistor_ch5;
@@ -660,7 +660,7 @@ int backlight_therm_get_hw_temp(void)
 		t_ret2 = wakeup_ta_algo(TA_CATMPLUS_TTJ);
 
 		if (t_ret2 < 0)
-			pr_notice("[Thermal/TZ/BACKLIGHT_THERM]wakeup_ta_algo %d\n",
+			pr_debug("[Thermal/TZ/BACKLIGHT_THERM]wakeup_ta_algo %d\n",
 				t_ret2);
 	}
 
@@ -1080,7 +1080,7 @@ void backlight_therm_prepare_table(int table_num)
 		break;
 	}
 
-	pr_notice("[Thermal/TZ/BACKLIGHT_THERM] %s table_num=%d\n", __func__, table_num);
+	pr_debug("[Thermal/TZ/BACKLIGHT_THERM] %s table_num=%d\n", __func__, table_num);
 
 #if 0
 	{
