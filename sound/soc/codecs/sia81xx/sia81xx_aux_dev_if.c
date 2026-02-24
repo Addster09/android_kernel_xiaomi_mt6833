@@ -12,7 +12,7 @@
  */
 
 
-#define DEBUG
+//#define DEBUG
 #define LOG_FLAG	"sia81xx_aux"
 
 #include <linux/kernel.h>
