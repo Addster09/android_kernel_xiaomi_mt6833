@@ -1,5 +1,0 @@
-config TCP_BRUTAL
-    tristate "TCP Brutal module support"
-    depends on NET
-    help
-      Enable support for the TCP Brutal module.
