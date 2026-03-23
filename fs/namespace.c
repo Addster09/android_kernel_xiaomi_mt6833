@@ -112,7 +112,7 @@ static inline struct hlist_head *mp_hash(struct dentry *dentry)
 
 static int mnt_alloc_id(struct mount *mnt)
 {
-	int res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
+	int res = ida_simple_get(&mnt_id_ida, 0, 0, GFP_KERNEL);
 
 	if (res < 0)
 		return res;
@@ -131,12 +131,12 @@ static void mnt_free_id(struct mount *mnt)
 
 	// Second if susfs_mnt_id_backup was set after mnt_id reorder, free it if so.
 	if (likely(mnt->mnt.susfs_mnt_id_backup)) {
-		ida_free(&mnt_id_ida, mnt->mnt.susfs_mnt_id_backup);
+		ida_simple_remove(&mnt_id_ida, mnt->mnt.susfs_mnt_id_backup);
 		return;
 	}
 
 #endif
-	ida_free(&mnt_id_ida, mnt->mnt_id);
+	ida_simple_remove(&mnt_id_ida, mnt->mnt_id);
 }
 
 /*
@@ -153,10 +153,10 @@ static int mnt_alloc_group_id(struct mount *mnt)
 	 *   when boot-completed stage is triggered in core_hook.c 
 	 */
 	if (!susfs_is_sdcard_android_data_decrypted && mnt->mnt_id >= DEFAULT_KSU_MNT_ID) {
-		res = ida_alloc_min(&susfs_ksu_mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID, GFP_KERNEL);
+		res = ida_simple_get(&susfs_ksu_mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID, 0, GFP_KERNEL);
 		goto bypass_orig_flow;
 	}
-	res = ida_alloc_min(&mnt_group_ida, 1, GFP_KERNEL);
+	res = ida_simple_get(&mnt_group_ida, 1, 0, GFP_KERNEL);
 bypass_orig_flow:
 #else
 	int res = ida_alloc_min(&mnt_group_ida, 1, GFP_KERNEL);
@@ -178,17 +178,17 @@ void mnt_release_group_id(struct mount *mnt)
 	 * - Please note that if susfs_is_sdcard_android_data_decrypted is true, then
 	 *   it no longer checks for the sus mnt_group_id, and the allocated
 	 *   sus mnt_group_id will stay in kernel memory forever, and if user
-	 *   suddenly umounts the sus mount in global mnt namespace, the ida_free()
+	 *   suddenly umounts the sus mount in global mnt namespace, the ida_simple_remove()
 	 *   function will throw error to kernel log, but it won't affect the system,
 	 *   so it is fine.
 	 */
 	if (!susfs_is_sdcard_android_data_decrypted && mnt->mnt_group_id >= DEFAULT_KSU_MNT_GROUP_ID) {
-		ida_free(&susfs_ksu_mnt_group_ida, mnt->mnt_group_id);
+		ida_simple_remove(&susfs_ksu_mnt_group_ida, mnt->mnt_group_id);
 		mnt->mnt_group_id = 0;
 		return;
 	}
 #endif
-	ida_free(&mnt_group_ida, mnt->mnt_group_id);
+	ida_simple_remove(&mnt_group_ida, mnt->mnt_group_id);
 	mnt->mnt_group_id = 0;
 }
 
@@ -258,7 +258,7 @@ static struct mount *susfs_reuse_sus_vfsmnt(const char *name, int orig_mnt_id)
 		mnt->mnt_count = 1;
 		mnt->mnt_writers = 0;
 #endif
-		// Makes ida_free() easier to determine whether it should free the mnt_id or not
+		// Makes ida_simple_remove() easier to determine whether it should free the mnt_id or not
 		mnt->mnt.susfs_mnt_id_backup = DEFAULT_KSU_MNT_ID;
 
 		INIT_HLIST_NODE(&mnt->mnt_hash);
@@ -310,7 +310,7 @@ static struct mount *susfs_alloc_sus_vfsmnt(const char *name)
 		mnt->mnt_count = 1;
 		mnt->mnt_writers = 0;
 #endif
-		// Makes ida_free() easier to determine whether it should free the mnt_id or not
+		// Makes ida_simple_remove() easier to determine whether it should free the mnt_id or not
 		mnt->mnt.susfs_mnt_id_backup = DEFAULT_KSU_MNT_ID;
 
 		INIT_HLIST_NODE(&mnt->mnt_hash);
