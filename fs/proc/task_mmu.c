@@ -502,6 +502,9 @@ struct mem_size_stats {
 	unsigned long shared_hugetlb;
 	unsigned long private_hugetlb;
 	u64 pss;
+	u64 pss_anon;
+	u64 pss_file;
+	u64 pss_shmem;
 	u64 pss_locked;
 	u64 swap_pss;
 	bool check_shmem_swap;
@@ -795,11 +798,6 @@ void __weak arch_show_smap(struct seq_file *m, struct vm_area_struct *vma)
 
 static void smap_gather_stats(struct vm_area_struct *vma,
 			     struct mem_size_stats *mss)
-#define SEQ_PUT_DEC(str, val) \
-		seq_put_decimal_ull_width(m, str, (val) >> 10, 8)
-static int show_smap(struct seq_file *m, void *v)
-static void smap_gather_stats(struct vm_area_struct *vma,
-			     struct mem_size_stats *mss)
 {
 	struct mm_walk smaps_walk = {
 		.pmd_entry = smaps_pte_range,
@@ -815,16 +813,6 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 	/* In case of smaps_rollup, reset the value from previous vma */
 	mss->check_shmem_swap = false;
 	if (vma->vm_file && shmem_mapping(vma->vm_file->f_mapping)) {
-		/*
-		 * For shared or readonly shmem mappings we know that all
-		 * swapped out pages belong to the shmem object, and we can
-		 * obtain the swap value much more efficiently. For private
-		 * writable mappings, we might have COW pages that are
-		 * not affected by the parent swapped out pages of the shmem
-		 * object, so we have to distinguish them during the page walk.
-		 * Unless we know that the shmem object (or the part mapped by
-		 * our VMA) has no swapped out pages at all.
-		 */
 		unsigned long shmem_swapped = shmem_swap_usage(vma);
 
 		if (!shmem_swapped || (vma->vm_flags & VM_SHARED) ||
@@ -846,10 +834,17 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 		seq_put_decimal_ull_width(m, str, (val) >> 10, 8)
 
 /* Show the contents common for smaps and smaps_rollup */
-static void __show_smap(struct seq_file *m, const struct mem_size_stats *mss)
+static void __show_smap(struct seq_file *m, const struct mem_size_stats *mss, bool rollup_mode)
 {
 	SEQ_PUT_DEC("Rss:            ", mss->resident);
 	SEQ_PUT_DEC(" kB\nPss:            ", mss->pss >> PSS_SHIFT);
+	
+	if (rollup_mode) {
+		SEQ_PUT_DEC(" kB\nPss_Anon:       ", mss->pss_anon >> PSS_SHIFT);
+		SEQ_PUT_DEC(" kB\nPss_File:       ", mss->pss_file >> PSS_SHIFT);
+		SEQ_PUT_DEC(" kB\nPss_Shmem:      ", mss->pss_shmem >> PSS_SHIFT);
+	}
+
 	SEQ_PUT_DEC(" kB\nShared_Clean:   ", mss->shared_clean);
 	SEQ_PUT_DEC(" kB\nShared_Dirty:   ", mss->shared_dirty);
 	SEQ_PUT_DEC(" kB\nPrivate_Clean:  ", mss->private_clean);
@@ -863,10 +858,8 @@ static void __show_smap(struct seq_file *m, const struct mem_size_stats *mss)
 	seq_put_decimal_ull_width(m, " kB\nPrivate_Hugetlb: ",
 				  mss->private_hugetlb >> 10, 7);
 	SEQ_PUT_DEC(" kB\nSwap:           ", mss->swap);
-	SEQ_PUT_DEC(" kB\nSwapPss:        ",
-					mss->swap_pss >> PSS_SHIFT);
-	SEQ_PUT_DEC(" kB\nLocked:         ",
-					mss->pss_locked >> PSS_SHIFT);
+	SEQ_PUT_DEC(" kB\nSwapPss:        ", mss->swap_pss >> PSS_SHIFT);
+	SEQ_PUT_DEC(" kB\nLocked:         ", mss->pss_locked >> PSS_SHIFT);
 	seq_puts(m, " kB\n");
 }
 
@@ -884,26 +877,14 @@ static int show_smap(struct seq_file *m, void *v)
 	{
 		show_map_vma(m, vma);
 		SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
-		SEQ_PUT_DEC(" kB\nKernelPageSize: ", 4);
-		SEQ_PUT_DEC(" kB\nMMUPageSize:    ", 4);
+		SEQ_PUT_DEC(" kB\nKernelPageSize: ", 4096);
+		SEQ_PUT_DEC(" kB\nMMUPageSize:    ", 4096);
 		seq_puts(m, " kB\n");
 		__show_smap(m, &mss, false);
-		if (arch_pkeys_enabled())
-				seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
-		seq_puts(m, "VmFlags: mr mw me");
-		seq_putc(m, '\n');
+		seq_puts(m, "VmFlags: mr mw me\n");
 		goto bypass_orig_flow;
 	}
 #endif
-
-	smap_gather_stats(vma, &mss);
-
-static int show_smap(struct seq_file *m, void *v)
-{
-	struct vm_area_struct *vma = v;
-	struct mem_size_stats mss;
-
-	memset(&mss, 0, sizeof(mss));
 
 	smap_gather_stats(vma, &mss);
 
@@ -919,10 +900,8 @@ static int show_smap(struct seq_file *m, void *v)
 	SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
 	seq_puts(m, " kB\n");
 
-	__show_smap(m, &mss);
+	__show_smap(m, &mss, false);
 
-	if (arch_pkeys_enabled())
-		seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
 	show_smap_vma_flags(m, vma);
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
@@ -958,7 +937,19 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 	hold_task_mempolicy(priv);
 
 	for (vma = priv->mm->mmap; vma;) {
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		if (vma->vm_file &&
+			unlikely(file_inode(vma->vm_file)->i_state & BIT_SUS_MAPS) &&
+			susfs_is_current_proc_umounted())
+		{
+			goto bypass_orig_rollup_flow;
+		}
+#endif
 		smap_gather_stats(vma, &mss);
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+bypass_orig_rollup_flow:
+#endif
 		last_vma_end = vma->vm_end;
 
 		/*
@@ -969,62 +960,13 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 			up_read(&mm->mmap_sem);
 			down_read(&mm->mmap_sem);
 
-			/*
-			 * After dropping the lock, there are three cases to
-			 * consider. See the following example for explanation.
-			 *
-			 *   +------+------+-----------+
-			 *   | VMA1 | VMA2 | VMA3      |
-			 *   +------+------+-----------+
-			 *   |      |      |           |
-			 *  4k     8k     16k         400k
-			 *
-			 * Suppose we drop the lock after reading VMA2 due to
-			 * contention, then we get:
-			 *
-			 *	last_vma_end = 16k
-			 *
-			 * 1) VMA2 is freed, but VMA3 exists:
-			 *
-			 *    find_vma(mm, 16k - 1) will return VMA3.
-			 *    In this case, just continue from VMA3.
-			 *
-			 * 2) VMA2 still exists:
-			 *
-			 *    find_vma(mm, 16k - 1) will return VMA2.
-			 *    Iterate the loop like the original one.
-			 *
-			 * 3) No more VMAs can be found:
-			 *
-			 *    find_vma(mm, 16k - 1) will return NULL.
-			 *    No more things to do, just break.
-			 */
 			vma = find_vma(mm, last_vma_end - 1);
-			/* Case 3 above */
 			if (!vma)
 				break;
-
-			/* Case 1 above */
 			if (vma->vm_start >= last_vma_end)
 				continue;
 		}
-		/* Case 2 above */
 		vma = vma->vm_next;
-	for (vma = priv->mm->mmap; vma; vma = vma->vm_next) {
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (vma->vm_file &&
-			unlikely(file_inode(vma->vm_file)->i_state & BIT_SUS_MAPS) &&
-			susfs_is_current_proc_umounted())
-		{
-			memset(&mss, 0, sizeof(mss));
-			goto bypass_orig_flow;
-		}
-#endif
-		smap_gather_stats(vma, &mss);
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-bypass_orig_flow:
-#endif
-		last_vma_end = vma->vm_end;
 	}
 
 	show_vma_header_prefix(m, priv->mm->mmap->vm_start,
@@ -1032,7 +974,7 @@ bypass_orig_flow:
 	seq_pad(m, ' ');
 	seq_puts(m, "[rollup]\n");
 
-	__show_smap(m, &mss);
+	__show_smap(m, &mss, true);
 
 	release_task_mempolicy(priv);
 	up_read(&mm->mmap_sem);
