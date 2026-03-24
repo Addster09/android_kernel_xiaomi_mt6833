@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Compile script for Hydrogen kernel
-# Optimized by ChatGPT
+# Compile script for Aqua kernel
 
 # Remove out directory
 rm -rf out/arch/arm64/boot
@@ -48,23 +47,36 @@ echo
 CLEAN_BUILD=false
 INCLUDE_KSU=false
 
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            CLEAN_BUILD=true
+            ;;
+        --with-ksu)
+            INCLUDE_KSU=true
+            ;;
+        --redo-ksu)
+            rm -f .ksu_applied
+            INCLUDE_KSU=true
+            ;; 
+    esac
+done
+
 # Perform clean build if specified
 [ "$CLEAN_BUILD" = true ] && rm -rf out
 
+[ -f .ksu_applied ] && echo "Including KernelSU Next!"
+
 # Include KernelSU if specified
-if [ "$INCLUDE_KSU" = true ]; then
-    echo "Including KernelSU Next... Save your stuff!"
-    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-    git clone https://github.com/WildKernels/kernel_patches.git kernel_patches
-    cd KernelSU-Next
-    wget -q https://github.com/devnoname120/susfs4ksu-toco/raw/refs/heads/kernel-4.14-backport/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-    patch -p1 --forward < 10_enable_susfs_for_ksu.patch
-    for file in $(find ./kernel -maxdepth 2 -name "*.rej" -printf "%f\n" | cut -d'.' -f1); do
-        echo "Patching file: $file.c with fix_$file.c.patch"
-        patch -p1 --forward < "../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_$file.c.patch"
+if [[ "$INCLUDE_KSU" = true && ! -f .ksu_applied ]]; then
+    echo "Including KernelSU Next!"
+    git clone https://github.com/Addster09/EverpalPatches --depth=1
+    for patch in EverpalPatches/KSUPatches/000*.patch; do
+        patch -p1 < "$patch"
     done
-    sed -i '/susfs_set_kernel_sid();/d' kernel/selinux/rules.c
-    cd ..
+    rm -rf EverpalPatches
+    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy_susfs
+    touch .ksu_applied
 fi
 
 # Compilation process
@@ -91,12 +103,6 @@ if \
     cp out/arch/arm64/boot/Image.gz AnyKernel3
     (cd AnyKernel3 && zip -r9 "../$ZIPNAME" * -x '*.git*' README.md '*placeholder')
     rm -rf AnyKernel3 
-
-    # Clean up KernelSU changes if applied
-    if [ "$INCLUDE_KSU" = true ]; then
-        git restore drivers/{Makefile,Kconfig}
-        rm -rf KernelSU drivers/kernelsu
-    fi
 
     echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s)!"
     echo "Zip: $ZIPNAME"
