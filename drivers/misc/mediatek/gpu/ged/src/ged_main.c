@@ -45,6 +45,9 @@
 #include "ged_kpi.h"
 #include "ged_ge.h"
 #include "ged_gpu_tuner.h"
+#ifdef GED_SKI_SUPPORT
+#include "ged_ski.h"
+#endif
 
 #define GED_DRIVER_DEVICE_NAME "ged"
 
@@ -453,6 +456,10 @@ static void ged_exit(void)
 
 	ged_sysfs_exit();
 
+#ifdef GED_SKI_SUPPORT
+	ged_ski_exit();
+#endif
+
 	remove_proc_entry(GED_DRIVER_DEVICE_NAME, NULL);
 
 	platform_driver_unregister(&g_ged_pdrv);
@@ -579,8 +586,13 @@ static int ged_init(void)
 	if (err) {
 		GED_LOGE("@%s: failed to register ged driver\n",
 		__func__);
-		/* fall through as no impact */
 	}
+
+#ifdef GED_SKI_SUPPORT
+	if (ged_ski_init() != GED_OK) {
+		GED_LOGE("ged: failed to init SKI!\n");
+	}
+#endif
 
 	return 0;
 
