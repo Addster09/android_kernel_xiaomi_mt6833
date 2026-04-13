@@ -18,7 +18,7 @@ SECONDS=0
 DATE=$(date '+%Y%m%d-%H%M')
 
 # Toolchain
-TC_DIR="$HOME/toolchains/neutron-clang"
+TC_DIR="$HOME/toolchains/ZyC-clang-22.0.0"
 CURRENT_DIR=$(pwd)
 
 # Device Configs
@@ -29,8 +29,9 @@ ZIPNAME="AquaKernel-${DATE}.zip"
 # Ensure the toolchain is available
 if [ ! -d "$TC_DIR" ]; then
     mkdir -p "$TC_DIR" && cd "$TC_DIR" || exit
-    bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") -S=05012024
-    bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") --patch=glibc
+    wget https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250928-release/Clang-22.0.0git-20250928.tar.gz \
+    && tar xvf Clang-22.0.0git-20250928.tar.gz \
+    && rm -rf Clang-22.0.0git-20250928.tar.gz
     cd "$CURRENT_DIR" || exit
 fi
 
@@ -93,6 +94,7 @@ if \
 	LLVM_IAS=1 \
 	CROSS_COMPILE=aarch64-linux-gnu- \
 	CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+        KCFLAGS="-Wno-error=default-const-init-var-unsafe" \
 	Image.gz dtbs; \
 	then
 
