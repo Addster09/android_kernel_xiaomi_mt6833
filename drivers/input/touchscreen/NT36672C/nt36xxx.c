@@ -1542,9 +1542,6 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	uint32_t pen_btn2 = 0;
 	uint32_t pen_battery = 0;
 
-	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
-	sched_setscheduler(current, SCHED_FIFO, &param);
-
 #if WAKEUP_GESTURE
 	if (likely(bTouchIsAwake == 0)) {
 		pm_wakeup_event(&ts->input_dev->dev, 5000);
