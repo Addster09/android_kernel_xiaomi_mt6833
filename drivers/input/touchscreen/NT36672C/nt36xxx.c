@@ -977,7 +977,7 @@ static int32_t nvt_flash_open(struct inode *inode, struct file *file)
 {
 	struct nvt_flash_data *dev;
 
-	dev = kmalloc(sizeof(struct nvt_flash_data), GFP_KERNEL);
+	dev = kzalloc(sizeof(struct nvt_flash_data), GFP_KERNEL);
 	if (dev == NULL) {
 		NVT_ERR("Failed to allocate memory for nvt flash data\n");
 		return -ENOMEM;
@@ -1542,8 +1542,11 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	uint32_t pen_btn2 = 0;
 	uint32_t pen_battery = 0;
 
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
+	sched_setscheduler(current, SCHED_FIFO, &param);
+
 #if WAKEUP_GESTURE
-	if (bTouchIsAwake == 0) {
+	if (likely(bTouchIsAwake == 0)) {
 		pm_wakeup_event(&ts->input_dev->dev, 5000);
 	}
 #endif
@@ -1554,18 +1557,10 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + PEN_DATA_LEN + 1);
 	else
 		ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		NVT_ERR("CTP_SPI_READ failed.(%d)\n", ret);
 		goto XFER_ERROR;
 	}
-/*
-	//--- dump SPI buf ---
-	for (i = 0; i < 10; i++) {
-		printk("%02X %02X %02X %02X %02X %02X  ",
-			point_data[1+i*6], point_data[2+i*6], point_data[3+i*6], point_data[4+i*6], point_data[5+i*6], point_data[6+i*6]);
-	}
-	printk("\n");
-*/
 
 #if NVT_TOUCH_WDT_RECOVERY
    /* ESD protect by WDT */
@@ -1594,7 +1589,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif /* POINT_DATA_CHECKSUM */
 
 #if WAKEUP_GESTURE
-	if ((bTouchIsAwake == 0)&&(ts->gesture_enabled) ){
+	if (likely(bTouchIsAwake == 0)&&(ts->gesture_enabled) ){
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
 		mutex_unlock(&ts->lock);
