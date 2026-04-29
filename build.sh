@@ -66,18 +66,24 @@ done
 # Perform clean build if specified
 [ "$CLEAN_BUILD" = true ] && rm -rf out
 
-[ -f .ksu_applied ] && echo "Including KernelSU Next!"
+[ -f out/.ksu_applied ] && echo "Including KernelSU Next!"
 
 # Include KernelSU if specified
-if [[ "$INCLUDE_KSU" = true && ! -f .ksu_applied ]]; then
+if [[ "$INCLUDE_KSU" = true && ! -f out/.ksu_applied ]]; then
     echo "Including KernelSU Next!"
-    git clone https://github.com/Addster09/EverpalPatches --depth=1
-    for patch in EverpalPatches/KSUPatches/000*.patch; do
-        patch -p1 < "$patch"
+    curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+    git clone https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git --depth=1 SU_patch
+    for patch in SU_patch/Patches/*sh; do
+        bash $patch
     done
-    rm -rf EverpalPatches
-    curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy_susfs
-    touch .ksu_applied
+    patch -p1 < SU_patch/Patches/Patch/susfs_patch_to_4.14.patch
+    wget https://raw.githubusercontent.com/Addster09/EverpalPatches/main/KSUPatches/defconfig-Enable-KSU-and-SUSFS.patch
+    wget https://raw.githubusercontent.com/Addster09/EverpalPatches/main/KSUPatches/susfs_patch_taskmmu.patch
+    patch -p1 < defconfig-Enable-KSU-and-SUSFS.patch
+    patch -p1 < susfs_patch_taskmmu.patch
+    rm -rf defconfig-Enable-KSU-and-SUSFS.patch susfs_patch_taskmmu.patch
+    rm -rf SU_patch
+    touch out/.ksu_applied
 fi
 
 # Compilation process
