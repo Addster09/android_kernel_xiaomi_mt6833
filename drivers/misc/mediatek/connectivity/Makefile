@@ -66,13 +66,15 @@ ifeq ($(CONFIG_CONN_PWR_DEBUG),y)
     obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/core/gen4m/
     obj-$(CONFIG_MTK_COMBO_BT) += bt/mt66xx/
     obj-$(CONFIG_MTK_COMBO_GPS) += gps/
+endif
+
 ifeq ($(CONFIG_MTK_FMRADIO),y)
     export CFG_FM_CHIP_ID=6833
     export CFG_FM_CHIP=mt6631
     obj-y += fmradio/
 endif
 
-ifeq ($(CONFIG_MTK_COMBO), y)
+ifeq ($(CONFIG_MTK_COMBO),y)
     ccflags-y += -D CFG_CONNADP_BUILD_IN
 endif
 

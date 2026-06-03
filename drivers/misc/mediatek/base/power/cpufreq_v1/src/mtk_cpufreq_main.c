@@ -1146,7 +1146,7 @@ static unsigned int _calc_new_opp_idx(struct mt_cpu_dvfs *p, int new_opp_idx)
 	return new_opp_idx;
 }
 
-#ifdef MTK_CPU_FREQ_STANDARDIZE
+#ifdef CONFIG_MTK_CPU_FREQ_STANDARDIZE
 static void ppm_limit_callback(struct ppm_client_req req)
 {
 	struct ppm_client_req *ppm = (struct ppm_client_req *)&req;
@@ -1506,8 +1506,8 @@ static struct freq_attr *_mt_cpufreq_attr[] = {
 };
 
 static struct cpufreq_driver _mt_cpufreq_driver = {
+#ifndef CONFIG_MTK_CPU_FREQ_STANDARDIZE
 	.flags = CPUFREQ_ASYNC_NOTIFICATION | CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
-	.verify = _mt_cpufreq_verify,
 	.target = _mt_cpufreq_target,
 #else /* CONFIG_MTK_CPU_FREQ_STANDARDIZE */
 	.flags = CPUFREQ_HAVE_GOVERNOR_PER_POLICY,

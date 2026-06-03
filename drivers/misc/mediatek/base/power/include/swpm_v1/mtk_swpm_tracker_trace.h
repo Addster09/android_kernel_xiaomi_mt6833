@@ -32,6 +32,18 @@ TRACE_EVENT(swpm_power_idx,
 	TP_printk("%s", __get_str(power_idx_str))
 );
 
+TRACE_EVENT(swpm_power,
+	TP_PROTO(char *power),
+	TP_ARGS(power),
+	TP_STRUCT__entry(
+		 __string(power_str, power)
+	),
+	TP_fast_assign(
+		__assign_str(power_str, power);
+	),
+	TP_printk("%s", __get_str(power_str))
+);
+
 #endif /* _SWPM_TRACKER_TRACE_H */
 
 #undef TRACE_INCLUDE_PATH
