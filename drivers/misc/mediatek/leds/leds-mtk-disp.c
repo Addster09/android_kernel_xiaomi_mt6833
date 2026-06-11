@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2018 MediaTek Inc.
@@ -8,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/leds.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/sched.h>
@@ -15,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/workqueue.h>
+#include <linux/backlight.h>
 
 #include "leds-mtk-disp.h"
 
@@ -29,6 +32,12 @@ extern int lcm_get_cur_level(void);
 #endif
 
 #define CONFIG_LEDS_BRIGHTNESS_CHANGED
+
+/* Delay (ms) for the post-power-on brightness retry.  Must be long
+ * enough for the DRM enable sequence to complete and the display
+ * panel to become ready, but short enough to be imperceptible. */
+#define BL_RETRY_DELAY_MS  50
+
 /****************************************************************************
  * variables
  ***************************************************************************/
@@ -49,7 +58,7 @@ struct led_debug_info {
 
 struct led_desp {
 	int index;
-	char name[16];
+	char name[32];
 };
 
 struct leds_desp_info {
@@ -60,10 +69,17 @@ struct leds_desp_info {
 struct mtk_led_data {
 	struct led_desp desp;
 	struct led_conf_info conf;
+	struct backlight_device *bd;
 	int last_level;
 	int brightness;
+	int saved_brightness;
+	bool hw_disabled;
+	bool force_hw_update;
+	struct mutex lock;
+	struct delayed_work retry_work;
 	struct mtk_leds_info	*parent;
 	struct led_debug_info debug;
+	char bl_name[32];
 };
 
 struct mtk_leds_info {
@@ -112,6 +128,9 @@ static int call_notifier(int event, struct mtk_led_data *led_dat)
 static int getLedDespIndex(char *name)
 {
 	int i = 0;
+
+	if (!leds_info)
+		return -1;
 
 	while (i < leds_info->lens) {
 		if (!strcmp(name, leds_info->leds[i]->name))
@@ -210,18 +229,168 @@ int mt_leds_brightness_set(char *name, int level)
 }
 EXPORT_SYMBOL(mt_leds_brightness_set);
 
+static void brightness_retry_work(struct work_struct *work)
+{
+	struct mtk_led_data *led_dat = container_of(
+		to_delayed_work(work), struct mtk_led_data, retry_work);
+
+	mutex_lock(&led_dat->lock);
+
+	if (!led_dat->hw_disabled && led_dat->brightness > 0) {
+		pr_info("backlight: delayed retry, brightness=%d\n",
+			led_dat->brightness);
+		led_dat->conf.level = -1;
+		led_level_disp_set(led_dat, led_dat->brightness);
+	}
+
+	mutex_unlock(&led_dat->lock);
+}
+
+/****************************************************************************
+ * backlight callbacks
+ ***************************************************************************/
+
+static int mtk_backlight_update_status(struct backlight_device *bd)
+{
+	struct mtk_led_data *led_dat = bl_get_data(bd);
+	int brightness;
+
+	if (!led_dat)
+		return -EINVAL;
+
+	mutex_lock(&led_dat->lock);
+	brightness = bd->props.brightness;
+
+	if (bd->props.power != FB_BLANK_UNBLANK) {
+		cancel_delayed_work(&led_dat->retry_work);
+
+		if (!led_dat->hw_disabled) {
+			led_dat->saved_brightness = led_dat->brightness;
+			led_dat->hw_disabled = true;
+
+			pr_info("backlight: power off, saved brightness=%d\n",
+				led_dat->saved_brightness);
+
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+			call_notifier(2, led_dat);
+#endif
+			led_level_disp_set(led_dat, 0);
+		}
+		led_dat->brightness = 0;
+		led_dat->conf.cdev.brightness = 0;
+
+		mutex_unlock(&led_dat->lock);
+		return 0;
+	}
+
+	if (led_dat->hw_disabled) {
+		int restore = brightness;
+
+		if (restore <= 0)
+			restore = led_dat->saved_brightness;
+		if (restore <= 0)
+			restore = led_dat->conf.cdev.max_brightness;
+
+		pr_info("backlight: power on, restore brightness=%d\n",
+			restore);
+
+		led_dat->hw_disabled = false;
+		led_dat->force_hw_update = true;
+		/* Reset conf.level so led_level_disp_set() does not skip */
+		led_dat->conf.level = -1;
+
+		led_dat->brightness = restore;
+		led_dat->conf.cdev.brightness = restore;
+
+		/* Sync bd->props so the backlight sysfs reads correctly */
+		bd->props.brightness = restore;
+
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+		call_notifier(1, led_dat);
+#endif
+		led_level_disp_set(led_dat, restore);
+
+		led_dat->conf.level = -1;
+
+		schedule_delayed_work(&led_dat->retry_work,
+			msecs_to_jiffies(BL_RETRY_DELAY_MS));
+
+		mutex_unlock(&led_dat->lock);
+		return 0;
+	}
+
+	if (brightness > 0 &&
+	    (led_dat->force_hw_update ||
+	     led_dat->brightness != brightness)) {
+		bool forced = led_dat->force_hw_update;
+
+		led_dat->force_hw_update = false;
+
+		pr_info("backlight: set brightness=%d%s\n",
+			brightness, forced ? " (forced hw update)" : "");
+
+		led_dat->brightness = brightness;
+		led_dat->conf.cdev.brightness = brightness;
+
+		if (forced)
+			led_dat->conf.level = -1;
+
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+		call_notifier(1, led_dat);
+#endif
+		led_level_disp_set(led_dat, brightness);
+	}
+
+	mutex_unlock(&led_dat->lock);
+	return 0;
+}
+
+static int mtk_backlight_get_brightness(struct backlight_device *bd)
+{
+	struct mtk_led_data *led_dat = bl_get_data(bd);
+	if (!led_dat)
+		return 0;
+	return led_dat->brightness;
+}
+
+static const struct backlight_ops mtk_backlight_ops = {
+	.update_status  = mtk_backlight_update_status,
+	.get_brightness = mtk_backlight_get_brightness,
+};
+
+/****************************************************************************
+ * leds callback
+ ***************************************************************************/
 static int led_level_set(struct led_classdev *led_cdev,
 					  enum led_brightness brightness)
 {
 	int trans_level = 0;
+	bool forced;
 
-	struct led_conf_info *led_conf =
-		container_of(led_cdev, struct led_conf_info, cdev);
 	struct mtk_led_data *led_dat =
-		container_of(led_conf, struct mtk_led_data, conf);
+		container_of(led_cdev, struct mtk_led_data, conf.cdev);
 
-	if (led_dat->brightness == brightness)
+	if (!led_dat)
+		return -EINVAL;
+
+	mutex_lock(&led_dat->lock);
+
+	if (led_dat->bd &&
+	    led_dat->bd->props.power != FB_BLANK_UNBLANK) {
+		pr_info("led: ignored brightness=%d because bl_power=%d\n",
+			brightness, led_dat->bd->props.power);
+		mutex_unlock(&led_dat->lock);
 		return 0;
+	}
+
+	if (!led_dat->force_hw_update &&
+	    led_dat->brightness == brightness) {
+		mutex_unlock(&led_dat->lock);
+		return 0;
+	}
+
+	forced = led_dat->force_hw_update;
+	led_dat->force_hw_update = false;
 
 	trans_level = (
 		(((1 << led_dat->conf.trans_bits) - 1) * brightness
@@ -234,7 +403,12 @@ static int led_level_set(struct led_classdev *led_cdev,
 		output_met_backlight_tag(brightness);
 #endif
 
-led_dat->brightness = brightness;
+	led_dat->brightness = brightness;
+	led_dat->conf.cdev.brightness = brightness;
+
+	if (forced)
+		led_dat->conf.level = -1;
+
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 	call_notifier(1, led_dat);
 #endif
@@ -244,6 +418,10 @@ led_dat->brightness = brightness;
 	led_level_disp_set(led_dat, brightness);
 	led_dat->last_level = brightness;
 #endif
+	if (led_dat->bd)
+		led_dat->bd->props.brightness = brightness;
+
+	mutex_unlock(&led_dat->lock);
 	return 0;
 
 }
@@ -251,20 +429,53 @@ led_dat->brightness = brightness;
 static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 {
 	int ret;
+        struct backlight_properties props;
 
 	s_led->conf.cdev.flags = LED_CORE_SUSPENDRESUME;
 	s_led->conf.cdev.brightness_set_blocking = led_level_set;
-	s_led->brightness = s_led->conf.cdev.max_brightness;
-	s_led->conf.level = s_led->conf.cdev.max_brightness;
-	s_led->last_level = s_led->conf.cdev.max_brightness;
-	ret = devm_led_classdev_register(dev, &(s_led->conf.cdev));
+        mutex_init(&s_led->lock);
+        s_led->hw_disabled = false;
+        s_led->force_hw_update = false;
+        s_led->saved_brightness = 0;
+        INIT_DELAYED_WORK(&s_led->retry_work, brightness_retry_work);
+
+        /* prepare backlight name dynamically */
+        snprintf(s_led->bl_name, sizeof(s_led->bl_name),
+                "panel%d-backlight", s_led->desp.index);
+
+        memset(&props, 0, sizeof(props));
+        props.type = BACKLIGHT_RAW;
+        props.max_brightness = s_led->conf.cdev.max_brightness;
+
+        s_led->bd = devm_backlight_device_register(dev,
+                                        s_led->bl_name, dev, s_led,
+                                        &mtk_backlight_ops, &props);
+        if (IS_ERR(s_led->bd)) {
+                pr_notice("backlight device register fail!\n");
+                return PTR_ERR(s_led->bd);
+        }
+
+        /* leds registration (keep original name for compatibility) */
+        ret = devm_led_classdev_register(dev, &s_led->conf.cdev);
+
 	if (ret < 0) {
-		pr_err("led class register fail!");
+		pr_err("led class register fail!\n");
 		return ret;
 	}
-	pr_debug("%s devm_led_classdev_register ok! ", s_led->conf.cdev.name);
+        /* initialize defaults */
+        s_led->brightness = s_led->conf.cdev.max_brightness;
+        s_led->conf.level = s_led->conf.cdev.max_brightness;
+        s_led->last_level = s_led->conf.cdev.max_brightness;
 
+        s_led->bd->props.brightness = s_led->conf.cdev.max_brightness;
+
+	/* set hw to initial level */
 	led_level_set(&s_led->conf.cdev, s_led->conf.cdev.brightness);
+
+	pr_info("%s backlight(%s) and leds(%s) registered\n",
+			s_led->conf.cdev.name, s_led->bl_name,
+			s_led->conf.cdev.name);
+
 	return 0;
 
 }
@@ -294,6 +505,11 @@ static int mtk_leds_parse_dt(struct device *dev,
 			ret = -EINVAL;
 			goto out_led_dt;
 		}
+
+		/* copy label into desp.name (safe buffer) */
+		strlcpy(s_led->desp.name, s_led->conf.cdev.name,
+				sizeof(s_led->desp.name));
+
 		ret = of_property_read_u32(child,
 			"led-bits", &(s_led->conf.led_bits));
 		if (ret) {
@@ -330,8 +546,7 @@ static int mtk_leds_parse_dt(struct device *dev,
 			num, s_led->conf.cdev.name,
 			s_led->conf.max_level,
 			s_led->conf.led_bits);
-		strncpy(s_led->desp.name, s_led->conf.cdev.name,
-			strlen(s_led->conf.cdev.name));
+
 		s_led->desp.index = num;
 		leds_info->leds[num] = &s_led->desp;
 		s_led->conf.cdev.brightness = level;
@@ -401,6 +616,8 @@ static int mtk_leds_remove(struct platform_device *pdev)
 	if (m_leds)
 		return 0;
 	for (i = 0; i < m_leds->nums; i++) {
+		/* Cancel any pending retry before unregistering */
+		cancel_delayed_work_sync(&m_leds->leds[i].retry_work);
 		if (!m_leds->leds[i].parent)
 			continue;
 		led_classdev_unregister(&m_leds->leds[i].conf.cdev);
@@ -418,6 +635,8 @@ static void mtk_leds_shutdown(struct platform_device *pdev)
 	struct mtk_leds_info *m_leds = dev_get_platdata(&pdev->dev);
 
 	for (i = 0; m_leds && i < m_leds->nums; i++) {
+		/* Cancel any pending retry during shutdown */
+		cancel_delayed_work(&m_leds->leds[i].retry_work);
 		if (!&(m_leds->leds[i]))
 			continue;
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
