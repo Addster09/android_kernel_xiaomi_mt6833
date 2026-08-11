@@ -109,6 +109,10 @@ extern int charger_manager_enable_charging(
 	struct charger_consumer *consumer,
 	int idx,
 	bool en);
+extern int charger_manager_enable_hz(
+	struct charger_consumer *consumer,
+	int idx,
+	bool en);
 extern int charger_manager_get_zcv(
 	struct charger_consumer *consumer,
 	int idx,
