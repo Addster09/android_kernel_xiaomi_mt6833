@@ -845,6 +845,7 @@ struct mtk_battery {
 	int fixed_uisoc;
 
 	struct charger_consumer *pbat_consumer;
+	bool input_suspend;
 	struct notifier_block bat_nb;
 
 /* ptim */
