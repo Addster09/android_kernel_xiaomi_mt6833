@@ -572,8 +572,7 @@ static inline void hf_manager_save_update_enable(struct hf_client *client,
 		old->start_time = request->start_time;
 		/* update new */
 		if (!request->enable)
-			atomic64_set(&request->start_time,
-				ktime_get_boottime_ns());
+		request->start_time = ktime_get_boottime_ns();
 		request->enable = true;
 		request->down_sample = cmd->down_sample;
 		request->delay = batch->delay;
